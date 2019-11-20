@@ -2,10 +2,12 @@ import asyncio
 import logging
 import os
 import sys
+from pathlib import Path
 
 from quart import Quart
 
 from . import azavea
+from . import db
 from . import view
 
 try:
@@ -33,7 +35,8 @@ log.addHandler(handler)
 
 def create_app(test_config=None):
     app = Quart(__name__, instance_relative_config=True)
-    app.config.from_mapping(SECRET_KEY='dev')
+    app.config.from_mapping(SECRET_KEY='dev',
+                            DATABASE=Path(app.instance_path) / 'cache.db')
     app.config.from_pyfile('config.py', silent=True)
 
     if test_config is not None:
@@ -42,9 +45,11 @@ def create_app(test_config=None):
     app.register_blueprint(view.bp)
 
     app.azavea = azavea.Client(app.config['AZAVEA_TOKEN'])
+    db.init_app(app)
 
     @app.after_serving
     async def teardown(*args):
         await app.azavea.teardown()
+        await db.close_db()
 
     return app

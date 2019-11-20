@@ -16,6 +16,7 @@ uvloop = [
     { version = "^0.12.2", platform = "linux" },
     { version = "^0.12.2", platform = "darwin" }
 ]
+aiosqlite = "^0.10.0"
 
 [tool.poetry.dev-dependencies]
 pytest = "^4.6"

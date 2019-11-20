@@ -1,0 +1,6 @@
+DROP TABLE IF EXISTS cache;
+
+CREATE TABLE cache (
+  id TEXT PRIMARY KEY,
+  data TEXT
+);

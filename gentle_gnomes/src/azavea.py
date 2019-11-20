@@ -2,8 +2,11 @@ import asyncio
 import logging
 import typing as t
 from dataclasses import dataclass
+from functools import wraps
 
 import aiohttp
+
+from . import db
 
 log = logging.getLogger(__name__)
 
@@ -20,6 +23,34 @@ class City:
         return f'{self.name}, {self.admin}'
 
 
+def _cache(*paths):
+    """
+    Wrapper for caching any endpoints that contain an item from `paths`.
+
+    For example `_cache('foo', 'baz')` would cache `/foo/bar`, `bar/baz/foo`, `bar/baz`, etc.
+    """
+
+    def outer(fn):
+
+        @wraps(fn)
+        async def inner(self, endpoint: str, *args, **kwds):
+            wants_cache = any(path in endpoint for path in paths)
+            if wants_cache:
+                result = await db.get(endpoint)
+                if result is None:
+                    result = await fn(self, endpoint, *args, **kwds)
+                    await db.insert(endpoint, result)
+
+            else:
+                result = await fn(self, endpoint, *args, **kwds)
+
+            return result
+
+        return inner
+
+    return outer
+
+
 class Client:
     """Client for interacting with the Azavea Climate API."""
 
@@ -29,6 +60,9 @@ class Client:
     def __init__(self, token: str):
         self.headers = {'Authorization': f'Token {token}'}
 
+    # Only cache climate data requests.
+    # Necessary to avoid caching '/city/nearest'
+    @_cache('climate-data')
     async def _get(self, endpoint: str, **kwargs) -> t.Union[t.Dict, t.List]:
         if self.session is None:
             self.session = aiohttp.ClientSession(headers=self.headers)
